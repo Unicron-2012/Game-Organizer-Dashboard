@@ -30,9 +30,9 @@ The dashboard is the main control center where users can:
 
 > Add screenshot here
 
-```
+
 /public/dashboard.png
-```
+
 
 ---
 
