@@ -49,10 +49,9 @@ The members page shows all users in a group with their roles and management opti
 
 ### 📸 Screenshot
 
-> Add screenshot here
 
 ```
-![Members](./public/screenshots/members.png)
+![Members](./public/members.png)
 ```
 
 ---
