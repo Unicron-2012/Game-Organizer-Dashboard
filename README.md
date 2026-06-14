@@ -31,7 +31,7 @@ The dashboard is the main control center where users can:
 > Add screenshot here
 
 
-![Dashboard](./public/screenshots/dashboard.png)
+![Dashboard](.dashboard.png.png)
 
 
 ---
@@ -50,9 +50,8 @@ The members page shows all users in a group with their roles and management opti
 ### 📸 Screenshot
 
 
-```
-![Members](./public/members.png)
-```
+![Members](./members.png.png)
+
 
 ---
 
@@ -70,9 +69,9 @@ The games page shows all upcoming games for a group.
 
 > Add screenshot here
 
-```
-![Games](./public/screenshots/games.png)
-```
+
+![Games](./games.png.png)
+
 
 ---
 
