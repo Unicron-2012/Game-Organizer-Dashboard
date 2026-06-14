@@ -1,0 +1,222 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { supabase } from "../../src/lib/supabase";
+import GroupCard from "../components/GroupCard";
+import LiveBackground from "../components/LiveBackground";
+
+export default function Dashboard() {
+  const [groupName, setGroupName] = useState("");
+  const [sport, setSport] = useState("");
+  const [groups, setGroups] = useState<any[]>([]);
+
+  const [stats, setStats] = useState({
+    totalGroups: 0,
+    totalMembers: 0,
+    totalGames: 0,
+    upcomingGames: 0,
+  });
+
+  useEffect(() => {
+    loadGroups();
+    loadStats();
+  }, []);
+
+  async function loadGroups() {
+    const { data: userData } = await supabase.auth.getUser();
+    const user = userData?.user;
+
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from("groups")
+      .select("*")
+      .eq("created_by", user.id);
+
+    if (!error) {
+      setGroups(data || []);
+    }
+  }
+
+  async function loadStats() {
+    const { data: userData } = await supabase.auth.getUser();
+    const user = userData?.user;
+
+    if (!user) return;
+
+    // groups
+    const { data: groups } = await supabase
+      .from("groups")
+      .select("id")
+      .eq("created_by", user.id);
+
+    const groupIds = groups?.map((g) => g.id) || [];
+
+    // members
+    const { count: memberCount } = await supabase
+      .from("memberships")
+      .select("*", { count: "exact", head: true })
+      .in("group_id", groupIds);
+
+    // games
+    const { data: games } = await supabase
+      .from("games")
+      .select("id, game_date")
+      .in("group_id", groupIds);
+
+    const now = new Date();
+
+    const upcoming =
+      games?.filter(
+        (g) => new Date(g.game_date) > now
+      ).length || 0;
+
+    setStats({
+      totalGroups: groupIds.length,
+      totalMembers: memberCount || 0,
+      totalGames: games?.length || 0,
+      upcomingGames: upcoming,
+    });
+  }
+
+  async function createGroup() {
+    const { data: userData } = await supabase.auth.getUser();
+    const user = userData?.user;
+
+    if (!user) {
+      alert("Please login first");
+      return;
+    }
+
+    const { error } = await supabase.from("groups").insert({
+      name: groupName,
+      sport,
+      created_by: user.id,
+    });
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    setGroupName("");
+    setSport("");
+
+    loadGroups();
+    loadStats();
+  }
+
+  async function createInvite(groupId: string) {
+    const token = crypto.randomUUID();
+
+    const { error } = await supabase.from("invites").insert({
+      group_id: groupId,
+      token,
+    });
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    const inviteLink = `${window.location.origin}/join/${token}`;
+
+    await navigator.clipboard.writeText(inviteLink);
+
+    alert(`Invite copied!\n\n${inviteLink}`);
+  }
+
+  return (
+    <>
+      <LiveBackground />
+
+      <div className="relative z-10 max-w-6xl mx-auto px-4 py-6">
+
+        <h1 className="text-4xl font-bold text-white mb-6 text-center">
+          Group Organizer Dashboard
+        </h1>
+
+        {/* STATS CARDS */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <div className="bg-gray-900/80 p-4 rounded text-center">
+            <p className="text-2xl font-bold text-white">
+              {stats.totalGroups}
+            </p>
+            <p className="text-gray-300">Groups</p>
+          </div>
+
+          <div className="bg-gray-900/80 p-4 rounded text-center">
+            <p className="text-2xl font-bold text-white">
+              {stats.totalMembers}
+            </p>
+            <p className="text-gray-300">Members</p>
+          </div>
+
+          <div className="bg-gray-900/80 p-4 rounded text-center">
+            <p className="text-2xl font-bold text-white">
+              {stats.totalGames}
+            </p>
+            <p className="text-gray-300">Games</p>
+          </div>
+
+          <div className="bg-gray-900/80 p-4 rounded text-center">
+            <p className="text-2xl font-bold text-white">
+              {stats.upcomingGames}
+            </p>
+            <p className="text-gray-300">Upcoming</p>
+          </div>
+        </div>
+
+        {/* CREATE GROUP */}
+        <div className="bg-gray-900/80 backdrop-blur-md border border-gray-700 rounded-xl p-5 max-w-xl mx-auto mb-10">
+          <h2 className="text-xl font-semibold text-white mb-4">
+            Create New Group
+          </h2>
+
+          <div className="grid md:grid-cols-2 gap-4">
+            <input
+              className="bg-gray-800 text-white border border-gray-600 rounded p-2"
+              placeholder="Group Name"
+              value={groupName}
+              onChange={(e) => setGroupName(e.target.value)}
+            />
+
+            <input
+              className="bg-gray-800 text-white border border-gray-600 rounded p-2"
+              placeholder="Sport"
+              value={sport}
+              onChange={(e) => setSport(e.target.value)}
+            />
+          </div>
+
+          <button
+            onClick={createGroup}
+            className="mt-4 w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded"
+          >
+            Create Group
+          </button>
+        </div>
+
+        {/* GROUPS */}
+        <h2 className="text-2xl text-white text-center mb-6">
+          My Groups
+        </h2>
+
+        <div className="flex justify-center">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {groups.map((group) => (
+              <div key={group.id} className="w-72">
+                <GroupCard
+                  group={group}
+                  onGenerateInvite={() =>
+                    createInvite(group.id)
+                  }
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
