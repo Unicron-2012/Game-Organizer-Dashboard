@@ -9,13 +9,15 @@ export default function LiveBackground() {
     let effect: any;
 
     const loadVanta = async () => {
+      if (typeof window === "undefined") return;
+
       const THREE = await import("three");
       const NET = (await import("vanta/dist/vanta.net.min")).default;
 
-      if (!effect && vantaRef.current) {
+      if (vantaRef.current && !effect) {
         effect = NET({
           el: vantaRef.current,
-          THREE,
+          THREE: THREE,
           mouseControls: true,
           touchControls: true,
           gyroControls: false,
@@ -32,9 +34,7 @@ export default function LiveBackground() {
     loadVanta();
 
     return () => {
-      if (effect) {
-        effect.destroy();
-      }
+      if (effect) effect.destroy();
     };
   }, []);
 
