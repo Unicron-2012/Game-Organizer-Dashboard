@@ -1,11 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "../../src/lib/supabase";
 import GroupCard from "../components/GroupCard";
 import LiveBackground from "../components/LiveBackground";
 
 export default function Dashboard() {
+  const router = useRouter();
+
   const [groupName, setGroupName] = useState("");
   const [sport, setSport] = useState("");
   const [groups, setGroups] = useState<any[]>([]);
@@ -18,13 +21,23 @@ export default function Dashboard() {
   });
 
   useEffect(() => {
-    loadGroups();
-    loadStats();
+    const init = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (!user) {
+        router.push("/login");
+        return;
+      }
+
+      await loadGroups();
+      await loadStats();
+    };
+
+    init();
   }, []);
 
   async function loadGroups() {
-    const { data: userData } = await supabase.auth.getUser();
-    const user = userData?.user;
+    const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) return;
 
@@ -39,26 +52,22 @@ export default function Dashboard() {
   }
 
   async function loadStats() {
-    const { data: userData } = await supabase.auth.getUser();
-    const user = userData?.user;
+    const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) return;
 
-    // groups
     const { data: groups } = await supabase
       .from("groups")
       .select("id")
       .eq("created_by", user.id);
 
     const groupIds = groups?.map((g) => g.id) || [];
-
-    // members
+    
     const { count: memberCount } = await supabase
       .from("memberships")
       .select("*", { count: "exact", head: true })
       .in("group_id", groupIds);
 
-    // games
     const { data: games } = await supabase
       .from("games")
       .select("id, game_date")
@@ -67,9 +76,7 @@ export default function Dashboard() {
     const now = new Date();
 
     const upcoming =
-      games?.filter(
-        (g) => new Date(g.game_date) > now
-      ).length || 0;
+      games?.filter((g) => new Date(g.game_date) > now).length || 0;
 
     setStats({
       totalGroups: groupIds.length,
@@ -80,13 +87,9 @@ export default function Dashboard() {
   }
 
   async function createGroup() {
-    const { data: userData } = await supabase.auth.getUser();
-    const user = userData?.user;
+    const { data: { user } } = await supabase.auth.getUser();
 
-    if (!user) {
-      alert("Please login first");
-      return;
-    }
+    if (!user) return router.push("/login");
 
     const { error } = await supabase.from("groups").insert({
       name: groupName,
@@ -136,33 +139,25 @@ export default function Dashboard() {
           Group Organizer Dashboard
         </h1>
 
-        {/* STATS CARDS */}
+        {/* STATS */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           <div className="bg-gray-900/80 p-4 rounded text-center">
-            <p className="text-2xl font-bold text-white">
-              {stats.totalGroups}
-            </p>
+            <p className="text-2xl font-bold text-white">{stats.totalGroups}</p>
             <p className="text-gray-300">Groups</p>
           </div>
 
           <div className="bg-gray-900/80 p-4 rounded text-center">
-            <p className="text-2xl font-bold text-white">
-              {stats.totalMembers}
-            </p>
+            <p className="text-2xl font-bold text-white">{stats.totalMembers}</p>
             <p className="text-gray-300">Members</p>
           </div>
 
           <div className="bg-gray-900/80 p-4 rounded text-center">
-            <p className="text-2xl font-bold text-white">
-              {stats.totalGames}
-            </p>
+            <p className="text-2xl font-bold text-white">{stats.totalGames}</p>
             <p className="text-gray-300">Games</p>
           </div>
 
           <div className="bg-gray-900/80 p-4 rounded text-center">
-            <p className="text-2xl font-bold text-white">
-              {stats.upcomingGames}
-            </p>
+            <p className="text-2xl font-bold text-white">{stats.upcomingGames}</p>
             <p className="text-gray-300">Upcoming</p>
           </div>
         </div>
@@ -208,14 +203,13 @@ export default function Dashboard() {
               <div key={group.id} className="w-72">
                 <GroupCard
                   group={group}
-                  onGenerateInvite={() =>
-                    createInvite(group.id)
-                  }
+                  onGenerateInvite={() => createInvite(group.id)}
                 />
               </div>
             ))}
           </div>
         </div>
+
       </div>
     </>
   );
