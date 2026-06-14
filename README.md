@@ -31,7 +31,7 @@ The dashboard is the main control center where users can:
 > Add screenshot here
 
 
-![Dashboard](.dashboard.png.png)
+![Dashboard](./dashboard.png.png)
 
 
 ---
