@@ -1,36 +1,133 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Group Organizer 📊
 
-## Getting Started
+A lightweight invite-only web app to manage recurring sports groups with RSVP tracking, game scheduling, attendance, and payment management.
 
-First, run the development server:
+---
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## 🚀 Features
+
+* Google Auth (Supabase)
+* Group creation and invite system
+* RSVP system (Yes / No / Maybe)
+* Game scheduling with cost tracking
+* Members management (roles: organizer, member, co-organizer)
+* Attendance tracking
+* Payment submission with UPI reference
+
+
+---
+
+## 🏠 Dashboard
+
+The dashboard is the main control center where users can:
+
+* Create new groups
+* View all created groups
+* Generate invite links
+* Create games inside each group
+
+### 📸 Screenshot
+
+> Add screenshot here
+
+```
+/public/screenshots/dashboard.png
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 👥 Members Page
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+The members page shows all users in a group with their roles and management options.
 
-## Learn More
+### Features:
 
-To learn more about Next.js, take a look at the following resources:
+* View group members
+* Promote / demote roles (organizer only)
+* Remove members
+* View email & name from profiles
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### 📸 Screenshot
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+> Add screenshot here
 
-## Deploy on Vercel
+```
+/public/screenshots/members.png
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+---
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 🎮 Games Page
+
+The games page shows all upcoming games for a group.
+
+### Features:
+
+* View game details (title, date, cost)
+* RSVP system (YES / NO / MAYBE)
+* Real-time attendance updates
+
+### 📸 Screenshot
+
+> Add screenshot here
+
+```
+/public/screenshots/games.png
+```
+
+---
+
+## 📊 Attendance Leaderboard
+
+Tracks attendance percentage per user.
+
+### Features:
+
+* Total games attended
+* Attendance percentage
+* Ranking system
+
+---
+
+## 🧱 Tech Stack
+
+* Next.js (App Router)
+* TypeScript
+* Tailwind CSS
+* Supabase (Auth + DB)
+* PostgreSQL
+
+---
+
+## ⚙️ Setup Instructions
+
+```bash
+npm install
+npm run dev
+```
+
+Create `.env` file:
+
+```
+NEXT_PUBLIC_SUPABASE_URL=your_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_key
+```
+
+---
+
+## 🚀 Deployment
+
+Deploy easily on Vercel:
+
+1. Push code to GitHub
+2. Import project in Vercel
+3. Add environment variables
+4. Deploy
+
+---
+
+## 👨‍💻 Author
+
+Built as part of Group Organizer system for managing recurring sports groups.
+
+---
