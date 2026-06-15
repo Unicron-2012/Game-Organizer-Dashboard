@@ -6,11 +6,17 @@ import { supabase } from "../../../../src/lib/supabase";
 
 export default function MembersPage() {
   const params = useParams();
-  const groupId = params.groupId as string;
+  const groupId = Array.isArray(params.groupId)
+    ? params.groupId[0]
+    : params.groupId;
 
   const [members, setMembers] = useState<any[]>([]);
   const [myRole, setMyRole] = useState("");
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (groupId) loadMembers();
+  }, [groupId]);
 
   const loadMembers = async () => {
     setLoading(true);
@@ -19,38 +25,43 @@ export default function MembersPage() {
       data: { user },
     } = await supabase.auth.getUser();
 
-    if (user) {
-      const { data: roleData } = await supabase
-        .from("memberships")
-        .select("role")
-        .eq("group_id", groupId)
-        .eq("user_id", user.id)
-        .single();
-
-      setMyRole(roleData?.role || "");
-    }
-
-    const { data, error } = await supabase
-      .from("memberships")
-      .select("id, role, user_id")
-      .eq("group_id", groupId);
-
-    if (error) {
-      console.error(error);
+    if (!user || !groupId) {
       setLoading(false);
       return;
     }
 
-    const userIds = data?.map((m) => m.user_id) || [];
+    const { data: roleData } = await supabase
+      .from("memberships")
+      .select("role")
+      .eq("group_id", groupId)
+      .eq("user_id", user.id)
+      .single();
+
+    setMyRole(roleData?.role || "");
+
+    const { data: membershipData, error } = await supabase
+      .from("memberships")
+      .select("id, role, user_id")
+      .eq("group_id", groupId);
+
+    if (error || !membershipData) {
+      console.error(error);
+      setMembers([]);
+      setLoading(false);
+      return;
+    }
+
+    const userIds = membershipData.map((m) => m.user_id);
 
     const { data: profiles } = await supabase
       .from("profiles")
       .select("id, name, email")
       .in("id", userIds);
 
-    const merged = data.map((m) => ({
+    const merged = membershipData.map((m) => ({
       ...m,
-      profiles: profiles?.find((p) => p.id === m.user_id),
+      profiles:
+        profiles?.find((p) => p.id === m.user_id) || null,
     }));
 
     setMembers(merged);
@@ -87,10 +98,6 @@ export default function MembersPage() {
 
     loadMembers();
   };
-
-  useEffect(() => {
-    loadMembers();
-  }, []);
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 text-white">

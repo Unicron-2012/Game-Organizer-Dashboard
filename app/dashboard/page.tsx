@@ -20,49 +20,58 @@ export default function Dashboard() {
     upcomingGames: 0,
   });
 
+  const [userId, setUserId] = useState<string | null>(null);
+
   useEffect(() => {
-    const init = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-
-      if (!user) {
-        router.push("/login");
-        return;
-      }
-
-      await loadGroups();
-      await loadStats();
-    };
-
     init();
   }, []);
 
-  async function loadGroups() {
+  async function init() {
     const { data: { user } } = await supabase.auth.getUser();
 
-    if (!user) return;
+    if (!user) {
+      router.push("/login");
+      return;
+    }
 
+    setUserId(user.id);
+
+    await loadGroups(user.id);
+    await loadStats(user.id);
+  }
+
+  async function loadGroups(uid: string) {
     const { data, error } = await supabase
       .from("groups")
       .select("*")
-      .eq("created_by", user.id);
+      .eq("created_by", uid);
 
-    if (!error) {
-      setGroups(data || []);
+    if (error) {
+      console.error("Groups error:", error.message);
+      return;
     }
+
+    setGroups(data || []);
   }
 
-  async function loadStats() {
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!user) return;
-
-    const { data: groups } = await supabase
+  async function loadStats(uid: string) {
+    const { data: groupsData } = await supabase
       .from("groups")
       .select("id")
-      .eq("created_by", user.id);
+      .eq("created_by", uid);
 
-    const groupIds = groups?.map((g) => g.id) || [];
-    
+    const groupIds = groupsData?.map((g) => g.id) || [];
+
+    if (groupIds.length === 0) {
+      setStats({
+        totalGroups: 0,
+        totalMembers: 0,
+        totalGames: 0,
+        upcomingGames: 0,
+      });
+      return;
+    }
+
     const { count: memberCount } = await supabase
       .from("memberships")
       .select("*", { count: "exact", head: true })
@@ -87,14 +96,17 @@ export default function Dashboard() {
   }
 
   async function createGroup() {
-    const { data: { user } } = await supabase.auth.getUser();
+    if (!userId) return router.push("/login");
 
-    if (!user) return router.push("/login");
+    if (!groupName || !sport) {
+      alert("Please fill all fields");
+      return;
+    }
 
     const { error } = await supabase.from("groups").insert({
       name: groupName,
       sport,
-      created_by: user.id,
+      created_by: userId,
     });
 
     if (error) {
@@ -105,8 +117,8 @@ export default function Dashboard() {
     setGroupName("");
     setSport("");
 
-    loadGroups();
-    loadStats();
+    await loadGroups(userId);
+    await loadStats(userId);
   }
 
   async function createInvite(groupId: string) {

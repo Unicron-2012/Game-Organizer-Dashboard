@@ -12,13 +12,13 @@ export default function LeaderboardPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadLeaderboard();
-  }, []);
+    if (groupId) loadLeaderboard();
+  }, [groupId]);
 
   async function loadLeaderboard() {
     setLoading(true);
 
-    const { data: members } = await supabase
+    const { data: members, error: memberError } = await supabase
       .from("memberships")
       .select(`
         user_id,
@@ -29,50 +29,60 @@ export default function LeaderboardPage() {
       `)
       .eq("group_id", groupId);
 
-    const { data: games, error } = await supabase
+    if (memberError || !members) {
+      setData([]);
+      setLoading(false);
+      return;
+    }
+
+    const { data: games, error: gameError } = await supabase
       .from("games")
       .select("id")
       .eq("group_id", groupId);
 
-    if (error || !games) {
+    if (gameError || !games) {
       setData([]);
       setLoading(false);
       return;
     }
 
     const gameIds = games.map((g) => g.id);
-    const totalGames = games?.length || 0;
+    const totalGames = games.length;
 
-    const { data: rsvps } = await supabase
-      .from("rsvps")
-      .select("*")
-      .in("game_id", gameIds);
+    let rsvps: any[] = [];
 
-    const leaderboard =
-      (members ?? []).map((m: any) => {
-        const profile = Array.isArray(m.profiles)
-          ? m.profiles[0]
-          : m.profiles;
+    if (gameIds.length > 0) {
+      const { data: rsvpData } = await supabase
+        .from("rsvps")
+        .select("*")
+        .in("game_id", gameIds);
 
-        const userRsvps =
-          rsvps?.filter((r) => r.user_id === m.user_id) || [];
+      rsvps = rsvpData || [];
+    }
 
-        const attended = userRsvps.filter(
-          (r) => r.status === "yes"
-        ).length;
+    const leaderboard = members.map((m: any) => {
+      const profile = m.profiles || {};
 
-        const percentage =
-          totalGames === 0
-            ? 0
-            : Math.round((attended / totalGames) * 100);
+      const userRsvps = rsvps.filter(
+        (r) => r.user_id === m.user_id
+      );
 
-        return {
-          name: profile?.name || profile?.email || "Unknown",
-          attended,
-          totalGames,
-          percentage,
-        };
-      }) || [];
+      const attended = userRsvps.filter(
+        (r) => r.status === "yes"
+      ).length;
+
+      const percentage =
+        totalGames === 0
+          ? 0
+          : Math.round((attended / totalGames) * 100);
+
+      return {
+        name: profile.name || profile.email || "Unknown",
+        attended,
+        totalGames,
+        percentage,
+      };
+    });
 
     leaderboard.sort((a, b) => b.percentage - a.percentage);
 
