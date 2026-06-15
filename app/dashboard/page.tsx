@@ -27,7 +27,9 @@ export default function Dashboard() {
   }, []);
 
   async function init() {
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
     if (!user) {
       router.push("/login");
@@ -40,18 +42,35 @@ export default function Dashboard() {
     await loadStats(user.id);
   }
 
+  // ✅ FIXED: include role from memberships
   async function loadGroups(uid: string) {
-    const { data, error } = await supabase
+    const { data: groupsData, error } = await supabase
       .from("groups")
       .select("*")
       .eq("created_by", uid);
 
-    if (error) {
-      console.error("Groups error:", error.message);
-      return;
-    }
+    if (error || !groupsData) return;
 
-    setGroups(data || []);
+    const groupIds = groupsData.map((g) => g.id);
+
+    const { data: memberships } = await supabase
+      .from("memberships")
+      .select("group_id, role")
+      .eq("user_id", uid)
+      .in("group_id", groupIds);
+
+    const roleMap = new Map();
+
+    memberships?.forEach((m) => {
+      roleMap.set(m.group_id, m.role);
+    });
+
+    const enriched = groupsData.map((g) => ({
+      ...g,
+      role: roleMap.get(g.id) || "member",
+    }));
+
+    setGroups(enriched);
   }
 
   async function loadStats(uid: string) {
@@ -146,7 +165,6 @@ export default function Dashboard() {
       <LiveBackground />
 
       <div className="relative z-10 max-w-6xl mx-auto px-4 py-6">
-
         <h1 className="text-4xl font-bold text-white mb-6 text-center">
           Group Organizer Dashboard
         </h1>
@@ -215,13 +233,13 @@ export default function Dashboard() {
               <div key={group.id} className="w-72">
                 <GroupCard
                   group={group}
+                  role={group.role}
                   onGenerateInvite={() => createInvite(group.id)}
                 />
               </div>
             ))}
           </div>
         </div>
-
       </div>
     </>
   );
