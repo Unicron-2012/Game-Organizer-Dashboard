@@ -12,6 +12,7 @@ export default function Dashboard() {
   const [groupName, setGroupName] = useState("");
   const [sport, setSport] = useState("");
   const [groups, setGroups] = useState<any[]>([]);
+  const [userId, setUserId] = useState<string | null>(null);
 
   const [stats, setStats] = useState({
     totalGroups: 0,
@@ -19,8 +20,6 @@ export default function Dashboard() {
     totalGames: 0,
     upcomingGames: 0,
   });
-
-  const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
     init();
@@ -42,46 +41,68 @@ export default function Dashboard() {
     await loadStats(user.id);
   }
 
-  // ✅ FIXED: include role from memberships
+  // ✅ FIXED: created + joined groups merged
   async function loadGroups(uid: string) {
-    const { data: groupsData, error } = await supabase
+    // 1. Created groups
+    const { data: createdGroups } = await supabase
       .from("groups")
       .select("*")
       .eq("created_by", uid);
 
-    if (error || !groupsData) return;
-
-    const groupIds = groupsData.map((g) => g.id);
-
+    // 2. Joined groups
     const { data: memberships } = await supabase
       .from("memberships")
       .select("group_id, role")
-      .eq("user_id", uid)
-      .in("group_id", groupIds);
+      .eq("user_id", uid);
 
-    const roleMap = new Map();
+    const groupIds = memberships?.map((m) => m.group_id) || [];
 
-    memberships?.forEach((m) => {
-      roleMap.set(m.group_id, m.role);
+    const { data: joinedGroups } = await supabase
+      .from("groups")
+      .select("*")
+      .in("id", groupIds);
+
+    // 3. merge both (remove duplicates)
+    const allGroupsMap = new Map();
+
+    // created groups => organizer
+    createdGroups?.forEach((g) => {
+      allGroupsMap.set(g.id, {
+        ...g,
+        role: "organizer",
+      });
     });
 
-    const enriched = groupsData.map((g) => ({
-      ...g,
-      role: roleMap.get(g.id) || "member",
-    }));
+    // joined groups => role from membership
+    joinedGroups?.forEach((g) => {
+      const membership = memberships?.find((m) => m.group_id === g.id);
 
-    setGroups(enriched);
+      allGroupsMap.set(g.id, {
+        ...g,
+        role: membership?.role || "member",
+      });
+    });
+
+    setGroups(Array.from(allGroupsMap.values()));
   }
 
   async function loadStats(uid: string) {
-    const { data: groupsData } = await supabase
+    const { data: created } = await supabase
       .from("groups")
       .select("id")
       .eq("created_by", uid);
 
-    const groupIds = groupsData?.map((g) => g.id) || [];
+    const { data: memberships } = await supabase
+      .from("memberships")
+      .select("group_id")
+      .eq("user_id", uid);
 
-    if (groupIds.length === 0) {
+    const createdIds = created?.map((g) => g.id) || [];
+    const joinedIds = memberships?.map((m) => m.group_id) || [];
+
+    const allIds = [...new Set([...createdIds, ...joinedIds])];
+
+    if (allIds.length === 0) {
       setStats({
         totalGroups: 0,
         totalMembers: 0,
@@ -94,12 +115,12 @@ export default function Dashboard() {
     const { count: memberCount } = await supabase
       .from("memberships")
       .select("*", { count: "exact", head: true })
-      .in("group_id", groupIds);
+      .in("group_id", allIds);
 
     const { data: games } = await supabase
       .from("games")
       .select("id, game_date")
-      .in("group_id", groupIds);
+      .in("group_id", allIds);
 
     const now = new Date();
 
@@ -107,7 +128,7 @@ export default function Dashboard() {
       games?.filter((g) => new Date(g.game_date) > now).length || 0;
 
     setStats({
-      totalGroups: groupIds.length,
+      totalGroups: allIds.length,
       totalMembers: memberCount || 0,
       totalGames: games?.length || 0,
       upcomingGames: upcoming,
@@ -122,16 +143,27 @@ export default function Dashboard() {
       return;
     }
 
-    const { error } = await supabase.from("groups").insert({
-      name: groupName,
-      sport,
-      created_by: userId,
-    });
+    const { data, error } = await supabase
+      .from("groups")
+      .insert({
+        name: groupName,
+        sport,
+        created_by: userId,
+      })
+      .select()
+      .single();
 
     if (error) {
       alert(error.message);
       return;
     }
+
+    // auto add as organizer
+    await supabase.from("memberships").insert({
+      group_id: data.id,
+      user_id: userId,
+      role: "organizer",
+    });
 
     setGroupName("");
     setSport("");
@@ -165,6 +197,7 @@ export default function Dashboard() {
       <LiveBackground />
 
       <div className="relative z-10 max-w-6xl mx-auto px-4 py-6">
+
         <h1 className="text-4xl font-bold text-white mb-6 text-center">
           Group Organizer Dashboard
         </h1>
@@ -193,30 +226,28 @@ export default function Dashboard() {
         </div>
 
         {/* CREATE GROUP */}
-        <div className="bg-gray-900/80 backdrop-blur-md border border-gray-700 rounded-xl p-5 max-w-xl mx-auto mb-10">
+        <div className="bg-gray-900/80 p-5 rounded-xl max-w-xl mx-auto mb-10">
           <h2 className="text-xl font-semibold text-white mb-4">
             Create New Group
           </h2>
 
-          <div className="grid md:grid-cols-2 gap-4">
-            <input
-              className="bg-gray-800 text-white border border-gray-600 rounded p-2"
-              placeholder="Group Name"
-              value={groupName}
-              onChange={(e) => setGroupName(e.target.value)}
-            />
+          <input
+            className="w-full mb-2 p-2 bg-gray-800 text-white rounded"
+            placeholder="Group Name"
+            value={groupName}
+            onChange={(e) => setGroupName(e.target.value)}
+          />
 
-            <input
-              className="bg-gray-800 text-white border border-gray-600 rounded p-2"
-              placeholder="Sport"
-              value={sport}
-              onChange={(e) => setSport(e.target.value)}
-            />
-          </div>
+          <input
+            className="w-full mb-2 p-2 bg-gray-800 text-white rounded"
+            placeholder="Sport"
+            value={sport}
+            onChange={(e) => setSport(e.target.value)}
+          />
 
           <button
             onClick={createGroup}
-            className="mt-4 w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded"
+            className="w-full bg-green-600 py-2 rounded text-white"
           >
             Create Group
           </button>
@@ -224,7 +255,7 @@ export default function Dashboard() {
 
         {/* GROUPS */}
         <h2 className="text-2xl text-white text-center mb-6">
-          My Groups
+          My Groups (Created + Joined)
         </h2>
 
         <div className="flex justify-center">
@@ -240,6 +271,7 @@ export default function Dashboard() {
             ))}
           </div>
         </div>
+
       </div>
     </>
   );
