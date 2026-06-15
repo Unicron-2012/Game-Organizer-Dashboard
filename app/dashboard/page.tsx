@@ -42,49 +42,43 @@ export default function Dashboard() {
   }
 
   // ✅ FIXED: created + joined groups merged
+  
   async function loadGroups(uid: string) {
-    // 1. Created groups
-    const { data: createdGroups } = await supabase
-      .from("groups")
-      .select("*")
-      .eq("created_by", uid);
+  // 1. Get memberships FIRST (source of truth)
+  const { data: memberships } = await supabase
+    .from("memberships")
+    .select("group_id, role")
+    .eq("user_id", uid);
 
-    // 2. Joined groups
-    const { data: memberships } = await supabase
-      .from("memberships")
-      .select("group_id, role")
-      .eq("user_id", uid);
+  const groupIds = memberships?.map((m) => m.group_id) || [];
 
-    const groupIds = memberships?.map((m) => m.group_id) || [];
-
-    const { data: joinedGroups } = await supabase
-      .from("groups")
-      .select("*")
-      .in("id", groupIds);
-
-    // 3. merge both (remove duplicates)
-    const allGroupsMap = new Map();
-
-    // created groups => organizer
-    createdGroups?.forEach((g) => {
-      allGroupsMap.set(g.id, {
-        ...g,
-        role: "organizer",
-      });
-    });
-
-    // joined groups => role from membership
-    joinedGroups?.forEach((g) => {
-      const membership = memberships?.find((m) => m.group_id === g.id);
-
-      allGroupsMap.set(g.id, {
-        ...g,
-        role: membership?.role || "member",
-      });
-    });
-
-    setGroups(Array.from(allGroupsMap.values()));
+  if (groupIds.length === 0) {
+    setGroups([]);
+    return;
   }
+
+  // 2. Fetch all groups user is part of
+  const { data: groupsData, error } = await supabase
+    .from("groups")
+    .select("*")
+    .in("id", groupIds);
+
+  if (error || !groupsData) return;
+
+  // 3. Attach role from memberships
+  const enriched = groupsData.map((g) => {
+    const membership = memberships?.find(
+      (m) => m.group_id === g.id
+    );
+
+    return {
+      ...g,
+      role: membership?.role || "member",
+    };
+  });
+
+  setGroups(enriched);
+}
 
   async function loadStats(uid: string) {
     const { data: created } = await supabase
